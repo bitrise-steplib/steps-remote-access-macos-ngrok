@@ -81,7 +81,7 @@ func downloadFromUrl(url string) error {
 	return nil
 }
 
-func createNgrokConf() error {
+func createNgrokConf(authToken string) error {
 	c, err := os.Create(ngrokFile)
 	if err != nil {
 		return fmt.Errorf("Error while creating file (%s), error: %v\n", ngrokFile, err)
@@ -188,7 +188,7 @@ func main() {
 	}
 
 	log.Printf("Creating Ngrok config to %s", ngrokFile)
-	if err := createNgrokConf(); err != nil {
+	if err := createNgrokConf(configs.AuthToken); err != nil {
 		fail("Failed to create Ngrok config, error: %v", err)
 	}
 
