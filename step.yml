@@ -1,12 +1,12 @@
 title: |-
   ngrok
 summary: |
-  ngrok
+  Remote access with Ngrok for macOS
 description: |
-  ngrok
-website: https://github.com/kdobmayer/bitrise-step-ngrok
-source_code_url: https://github.com/kdobmayer/bitrise-step-ngrok
-support_url: https://github.com/kdobmayer/bitrise-step-ngrok/issues
+  Remote access with Ngrok for macOS
+website: https://github.com/bitrise-steplib/steps-remote-access-macos-ngrok
+source_code_url: https://github.com/bitrise-steplib/steps-remote-access-macos-ngrok
+support_url: https://github.com/bitrise-steplib/steps-remote-access-macos-ngrok/issues
 host_os_tags:
   - osx-10.10
 type_tags:
@@ -21,16 +21,13 @@ deps:
   brew:
   - name: git
   - name: wget
-  apt_get:
-  - name: git
-  - name: wget
 
 toolkit:
   go:
-    package_name: github.com/kdobmayer/bitrise-step-ngrok
+    package_name: github.com/bitrise-steplib/steps-remote-access-macos-ngrok
 
 inputs:
-  - ssh_public_key:
+  - ssh_public_key: $SSH_PUBLIC_KEY
     opts:
       title: "SSH public key"
       summary: Summary.
@@ -40,7 +37,7 @@ inputs:
         Can be Markdown formatted text.
       is_expand: true
       is_required: true
-  - screen_share_pw:
+  - screen_share_pw: $NGROK_PASSWORD
     opts:
       title: "Screen share password"
       summary: Summary.
@@ -50,7 +47,7 @@ inputs:
         Can be Markdown formatted text.
       is_expand: true
       is_required: true
-  - auth_token:
+  - auth_token: $NGROK_AUTH_TOKEN
     opts:
       title: "Auth token"
       summary: Summary.

@@ -6,6 +6,7 @@ app:
   # If you want to share this step into a StepLib
   - BITRISE_STEP_ID: ngrok
   - BITRISE_STEP_VERSION: "0.0.1"
+
   # define these in your .bitrise.secrets.yml
   - NGROK_AUTH_TOKEN: $NGROK_AUTH_TOKEN
   - NGROK_PASSWORD: $NGROK_PASSWORD
