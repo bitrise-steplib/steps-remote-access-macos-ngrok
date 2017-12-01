@@ -9,7 +9,7 @@ app:
 
   # define these in your .bitrise.secrets.yml
   - NGROK_AUTH_TOKEN: $NGROK_AUTH_TOKEN
-  - NGROK_PASSWORD: $NGROK_PASSWORD
+  - SCREEN_SHARE_PASSWORD: $SCREEN_SHARE_PASSWORD
   - SSH_PUBLIC_KEY: $SSH_PUBLIC_KEY
 
 workflows:
@@ -36,7 +36,7 @@ workflows:
         run_if: true
         inputs:
         - ssh_public_key: "${SSH_PUBLIC_KEY}"
-        - screen_share_pw: "${NGROK_PASSWORD}"
+        - screen_share_pw: "${SCREEN_SHARE_PASSWORD}"
         - auth_token: "${NGROK_AUTH_TOKEN}"
 
   # ----------------------------------------------------------------
