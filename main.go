@@ -19,7 +19,7 @@ const (
 	url             = "https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-darwin-amd64.zip"
 	zipFile         = "ngrok.zip"
 	dir             = "/usr/local/bin"
-	ngrokFile       = "/etc/ngrok-config.yml"
+	ngrokFile       = "/tmp/ngrok-config.yml"
 )
 
 const ngrokConfig = `authtoken: $AUTHTOKEN
