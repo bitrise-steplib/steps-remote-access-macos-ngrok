@@ -1,0 +1,62 @@
+title: |-
+  ngrok
+summary: |
+  ngrok
+description: |
+  ngrok
+website: https://github.com/kdobmayer/bitrise-step-ngrok
+source_code_url: https://github.com/kdobmayer/bitrise-step-ngrok
+support_url: https://github.com/kdobmayer/bitrise-step-ngrok/issues
+host_os_tags:
+  - osx-10.10
+type_tags:
+  - utility
+
+is_requires_admin_user: true
+is_always_run: false
+is_skippable: false
+run_if: ""
+
+deps:
+  brew:
+  - name: git
+  - name: wget
+  apt_get:
+  - name: git
+  - name: wget
+
+toolkit:
+  go:
+    package_name: github.com/kdobmayer/bitrise-step-ngrok
+
+inputs:
+  - ssh_public_key:
+    opts:
+      title: "SSH public key"
+      summary: Summary.
+      description: |
+        Description of this input.
+
+        Can be Markdown formatted text.
+      is_expand: true
+      is_required: true
+  - screen_share_pw:
+    opts:
+      title: "Screen share password"
+      summary: Summary.
+      description: |
+        Description of this input.
+
+        Can be Markdown formatted text.
+      is_expand: true
+      is_required: true
+  - auth_token:
+    opts:
+      title: "Auth token"
+      summary: Summary.
+      description: |
+        Description of this input.
+
+        Can be Markdown formatted text.
+      is_expand: true
+      is_required: true

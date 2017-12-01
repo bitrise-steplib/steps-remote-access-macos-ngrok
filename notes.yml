@@ -1,0 +1,83 @@
+format_version: "4"
+default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
+project_type: ""
+trigger_map:
+- push_branch: '*'
+  workflow: remote-access
+workflows:
+  remote-access:
+    envs:
+    - REMOTE_ACCESS_SSH_PUB_KEY: PASTE-A-SSH-PUB-KEY-HERE
+      opts:
+        is_expand: false
+    - NGROK_CONFIG: |
+        authtoken: PASTE-YOUR-NGROK-AUTHTOKEN-HERE
+        tunnels:
+          ssh:
+            addr: 22
+            proto: tcp
+          vnc:
+            addr: 5900
+            proto: tcp
+      opts:
+        is_expand: false
+    steps:
+    - script@1.1.5:
+        title: uname -a & "mark"
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -ex
+
+            uname -a
+
+            # "mark" the host for ID
+            touch ~/Desktop/this-is-me.txt
+    - script@1.1.5:
+        title: allow ssh key
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -ex
+
+            # debug print content of authorized_keys
+            ls -alh ~/.ssh/authorized_keys
+
+            # generate an SSH key with: http://devcenter.bitrise.io/faq/how-to-generate-ssh-keypair/
+            # ssh-keygen -t rsa -b 4096 -P '' -f ./bitrise-ssh
+            # and copy the public key here
+            ssh_pub_key="$REMOTE_ACCESS_SSH_PUB_KEY"
+
+            # add it to authorized_keys
+            echo "" >> ~/.ssh/authorized_keys
+            echo "$ssh_pub_key" >> ~/.ssh/authorized_keys
+
+            cat ~/.ssh/authorized_keys
+
+            # print IP
+            echo "You can connect with the specified SSH key at $ip_address"
+    - script@1.1.5:
+        title: enable remote desktop
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -ex
+
+            export SCREEN_SHARE_PSW=TestPsw1234
+
+            sudo  /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -activate -configure -access -on -clientopts -setvnclegacy -vnclegacy yes -clientopts -setvncpw -vncpw "$SCREEN_SHARE_PSW" -restart -agent -privs -all
+    - script@1.1.5:
+        title: ngrok
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -ex
+
+            mkdir -p /tmp/ngrok
+            cd /tmp/ngrok
+            wget -O ngrok.zip https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-darwin-amd64.zip
+            unzip ./ngrok.zip
+
+            # write ngrok config into file
+            echo "$NGROK_CONFIG" > ./ngrok-config.yml
+            ./ngrok start --all --config ./ngrok-config.yml
