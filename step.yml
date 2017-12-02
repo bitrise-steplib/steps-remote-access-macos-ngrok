@@ -46,8 +46,8 @@ toolkit:
 inputs:
   - ngrok_auth_token: $NGROK_AUTH_TOKEN
     opts:
-      title: "Ngrok Authtoken"
-      summary: Summary.
+      title: Ngrok Authtoken
+      summary: Ngrok Authtoken
       description: |
         To be able to use this step you have to register an [ngrok](https://ngrok.com/) account.
         Once you registered an account on ngrok go to the [Auth menu](https://dashboard.ngrok.com/auth),
@@ -57,11 +57,16 @@ inputs:
   - ssh_public_key: $SSH_PUBLIC_KEY
     opts:
       title: "SSH public key"
-      summary: Summary.
+      summary: SSH public key for SSH connection.
       description: |
-        Description of this input.
+        The SSH public key to enable for SSH connection.
 
-        Can be Markdown formatted text.
+        You can generate a suitable SSH key with: `ssh-keygen -t rsa -b 4096 -P '' -f ./bitrise-ssh`
+
+        If you used the above command to generate the SSH key-pair:
+
+        * The public key (which you should specify for this input) can be found in: `bitrise-ssh.pub`
+        * And the private key (which you don't have to specify here, but you'll need it when you try to SSH into the host) can be found in: `./bitrise-ssh`
       is_expand: true
       is_required: true
   - user_and_screen_share_password: $USER_AND_SCREEN_SHARE_PASSWORD
