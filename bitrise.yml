@@ -80,13 +80,6 @@ workflows:
             fi
             echo "Running in CI mode, OK to run tests"
     - path::./:
-        title: Step Test
-        description: |-
-          The example input has a default value,
-          you can overwrite it if you want to, just like we did below,
-          but the step would use the default value specified in the `step.yml`
-          file if you would not specify another value.
-        run_if: "true"
         inputs:
         - ssh_public_key: ${SSH_PUBLIC_KEY}
         - screen_share_pw: ${SCREEN_SHARE_PASSWORD}
