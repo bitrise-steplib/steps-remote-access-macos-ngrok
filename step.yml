@@ -80,6 +80,7 @@ inputs:
         WARNING: enabling this option exposes secrets! Should only be used for development purposes / to debug the step!
       description: |
         **WARNING:** enabling this option exposes secrets! Should only be used for development purposes / to debug the step!
+      is_required: true
       value_options:
       - "false"
       - "true"

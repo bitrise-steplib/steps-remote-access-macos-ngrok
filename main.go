@@ -3,8 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"os/user"
+	"time"
+
+	"github.com/bitrise-io/go-utils/colorstring"
 
 	"github.com/bitrise-io/go-utils/fileutil"
 
@@ -104,10 +109,78 @@ func createNgrokConf(authToken string) error {
 	return errors.WithStack(fileutil.WriteBytesToFile(ngrokFile, ngrokConfigBytes))
 }
 
-func startNgrok() error {
+func startNgrokAsync() error {
 	cmd := command.New("ngrok", "start", "--all", "--config", ngrokFile)
 	log.Infof("\n$ %s\n", cmd.PrintableCommandArgs())
-	return cmd.Run()
+	return cmd.GetCmd().Start()
+}
+
+func fetchAndPrintAcessInfosFromNgrok() error {
+	// fetch ngrok tunnel infos via its localhost api
+	client := &http.Client{Timeout: 10 * time.Second}
+	r, err := client.Get("http://localhost:4040/api/tunnels")
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	defer r.Body.Close()
+
+	ngrokTunnels := struct {
+		Tunnels []struct {
+			Name      string `json:"name"`
+			PublicURL string `json:"public_url"`
+		} `json:"tunnels"`
+	}{}
+
+	if err := json.NewDecoder(r.Body).Decode(&ngrokTunnels); err != nil {
+		return errors.WithStack(err)
+	}
+
+	var sshURL, vncURL *url.URL
+	for _, aTunnel := range ngrokTunnels.Tunnels {
+		switch aTunnel.Name {
+		case "ssh":
+			u, err := url.Parse(aTunnel.PublicURL)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			sshURL = u
+		case "vnc":
+			u, err := url.Parse(aTunnel.PublicURL)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			vncURL = u
+		default:
+			return errors.Errorf("Unexpected tunnel found: %+v", aTunnel)
+		}
+	}
+
+	user, err := user.Current()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	currentUserUsername := user.Username
+
+	fmt.Println()
+	fmt.Println("--- Remote Access configs ---")
+	fmt.Println("Remote Access is now configured and enabled. ")
+
+	fmt.Println()
+	fmt.Println("SSH:")
+	fmt.Println("To SSH into this host:")
+	fmt.Println(" * First ensure that the SSH key you specified is activated (e.g. run: `ssh-add -D && ssh-add /path/to/ssh/private-key`")
+	fmt.Printf(" * Then ssh with: `ssh %s@%s -p %s`\n", currentUserUsername, sshURL.Hostname(), sshURL.Port())
+
+	fmt.Println()
+	fmt.Println("VNC (Screen Sharing):")
+	fmt.Println("To VNC / Screen Share / Remote Desktop into this host run the following command in your Terminal:")
+	fmt.Printf("    open vnc://%s@%s:%s\n", currentUserUsername, vncURL.Hostname(), vncURL.Port())
+	fmt.Println(colorstring.Yellow("Note: the password for the login is the password you specified for this step!"))
+	fmt.Println()
+	fmt.Println("------------------------------")
+	fmt.Println()
+
+	return nil
 }
 
 func doMain() error {
@@ -139,9 +212,15 @@ func doMain() error {
 	}
 
 	log.Printf("Starting Ngrok...")
-	if err := startNgrok(); err != nil {
+	if err := startNgrokAsync(); err != nil {
 		return errors.Wrap(err, "Failed to start Ngrok")
 	}
+	time.Sleep(5 * time.Second)
+
+	if err := fetchAndPrintAcessInfosFromNgrok(); err != nil {
+		return errors.Wrap(err, "Failed to fetch access infos from ngrok")
+	}
+
 	return nil
 }
 
