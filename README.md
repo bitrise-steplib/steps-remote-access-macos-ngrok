@@ -1,6 +1,8 @@
 # ngrok
 
-ngrok
+**DO NOT RUN THIS STEP ON YOUR OWN MAC!!**
+
+Based on its inputs, if specified, this step changes the current user's MacOS login password!
 
 
 ## How to use this Step

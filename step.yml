@@ -15,11 +15,12 @@ type_tags:
 is_requires_admin_user: true
 is_always_run: false
 is_skippable: false
-run_if: ""
+run_if: ".IsCI"
 
 deps:
   brew:
   - name: caskroom/cask/ngrok
+    bin_name: ngrok
 
 toolkit:
   go:
