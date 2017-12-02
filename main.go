@@ -223,10 +223,10 @@ func doMain() error {
 
 	// wait forever
 	fmt.Println()
-	fmt.Println("You can now connect, keeping the connection open ...")
-	for {
-		time.Sleep(10 * time.Second)
+	fmt.Print("You can now connect, keeping the connection open ...")
+	for true {
 		fmt.Print(".")
+		time.Sleep(1 * time.Second)
 	}
 
 	return nil
