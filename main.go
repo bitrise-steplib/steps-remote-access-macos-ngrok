@@ -225,8 +225,8 @@ func doMain() error {
 	fmt.Println()
 	fmt.Println("You can now connect, keeping the connection open ...")
 	for {
-		fmt.Println(".")
-		time.Sleep(1 * time.Second)
+		fmt.Print(".")
+		time.Sleep(10 * time.Second)
 	}
 
 	return nil
