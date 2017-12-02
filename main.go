@@ -221,6 +221,14 @@ func doMain() error {
 		return errors.Wrap(err, "Failed to fetch access infos from ngrok")
 	}
 
+	// wait forever
+	fmt.Println()
+	fmt.Println("You can now connect, keeping the connection open ...")
+	for {
+		time.Sleep(10 * time.Second)
+		fmt.Print(".")
+	}
+
 	return nil
 }
 
