@@ -16,7 +16,6 @@ import (
 const (
 	authorized_keys = "$HOME/.ssh/authorized_keys"
 	kickstart       = "/System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart"
-	url             = "https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-darwin-amd64.zip"
 	zipFile         = "ngrok.zip"
 	dir             = "/usr/local/bin"
 	ngrokFile       = "/tmp/ngrok-config.yml"
@@ -175,11 +174,6 @@ func main() {
 	log.Printf("Enable remote desktop...")
 	if err := EnableRemoteDesktop(configs.ScreenSharePW); err != nil {
 		fail("Can't enable remote desktop, error: %v", err)
-	}
-
-	log.Printf("Downloading %s to %s", url, zipFile)
-	if err := downloadFromUrl(url); err != nil {
-		fail("Error while downloading url (%s), error: %v\n", url, err)
 	}
 
 	log.Printf("Unzip %s to %s", zipFile, dir)
