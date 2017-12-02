@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/user"
 
 	"github.com/bitrise-io/go-utils/fileutil"
 
@@ -18,6 +19,10 @@ const (
 	zipFile                = "ngrok.zip"
 	dir                    = "/usr/local/bin"
 	ngrokFile              = "/tmp/ngrok-config.yml"
+)
+
+var (
+	isDebugMode = false
 )
 
 // NgrokTunnelConfig ...
@@ -54,7 +59,25 @@ func AddAuthorizedKey(sshKey string) error {
 func EnableRemoteDesktop(password string) error {
 	args := []string{kickstart, "-activate", "-configure", "-access", "-on", "-clientopts", "-setvnclegacy", "-vnclegacy", "yes", "-clientopts", "-setvncpw", "-vncpw", password, "-restart", "-agent", "-privs", "-all"}
 	cmd := command.New("sudo", args...)
-	log.Infof("\n$ %s\n", cmd.PrintableCommandArgs())
+	if isDebugMode {
+		log.Infof("\n$ %s\n", cmd.PrintableCommandArgs())
+	}
+	return cmd.Run()
+}
+
+// ChangeUserPassword ...
+func ChangeUserPassword(changePasswordTo string) error {
+	user, err := user.Current()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	log.Printf(" (!) Changing password of user: %s", user.Username)
+
+	cmd := command.New("sudo", "dscl", ".", "-passwd", "/Users/"+user.Username, changePasswordTo)
+	if isDebugMode {
+		log.Infof("\n$ %s\n", cmd.PrintableCommandArgs())
+	}
 	return cmd.Run()
 }
 
@@ -93,19 +116,25 @@ func doMain() error {
 	if err := configs.validate(); err != nil {
 		return errors.Wrap(err, "Issue with input")
 	}
+	isDebugMode = configs.IsStepDebugMode
 
 	log.Printf("Add authorized key...")
 	if err := AddAuthorizedKey(configs.SSHPublicKey); err != nil {
 		return errors.Wrap(err, "Can't add authorized key")
 	}
 
+	log.Printf("Change user password...")
+	if err := ChangeUserPassword(configs.PasswordToSet); err != nil {
+		return errors.Wrap(err, "Can't change user password")
+	}
+
 	log.Printf("Enable remote desktop...")
-	if err := EnableRemoteDesktop(configs.ScreenSharePW); err != nil {
+	if err := EnableRemoteDesktop(configs.PasswordToSet); err != nil {
 		return errors.Wrap(err, "Can't enable remote desktop")
 	}
 
 	log.Printf("Creating Ngrok config to %s", ngrokFile)
-	if err := createNgrokConf(configs.AuthToken); err != nil {
+	if err := createNgrokConf(configs.NgrokAuthToken); err != nil {
 		return errors.Wrap(err, "Failed to create Ngrok config")
 	}
 
