@@ -1,9 +1,26 @@
 title: |-
-  ngrok
+  Remote access with Ngrok for macOS
 summary: |
-  Remote access with Ngrok for macOS
+  Remote access with Ngrok for macOS. Exposes SSH and VNC (Screen Sharing) ports via ngrok.
 description: |
-  Remote access with Ngrok for macOS
+  ## Warning!! DO NOT run this step on your own Mac!!
+
+  **DO NOT RUN THIS STEP ON YOUR OWN MAC!!**
+
+  Based on its inputs, if specified, this step changes the current user's MacOS login password!
+
+  The Step also changes the SSH `authorized_keys`, to allow access for the specified key,
+  so please be very cautious where you run this step!
+
+  This step was created purely for remote debugging purposes!
+
+  ## Setup
+
+  Exposes SSH and VNC (Screen Sharing) ports via [ngrok](https://ngrok.com/).
+
+  To be able to use this step you have to register an [ngrok](https://ngrok.com/) account.
+  Once you registered an account on ngrok go to the [Auth menu](https://dashboard.ngrok.com/auth),
+  you can find your Ngrok Authtoken there.
 website: https://github.com/bitrise-steplib/steps-remote-access-macos-ngrok
 source_code_url: https://github.com/bitrise-steplib/steps-remote-access-macos-ngrok
 support_url: https://github.com/bitrise-steplib/steps-remote-access-macos-ngrok/issues
@@ -15,45 +32,60 @@ type_tags:
 is_requires_admin_user: true
 is_always_run: false
 is_skippable: false
-run_if: ""
+run_if: ".IsCI"
 
 deps:
   brew:
-  - name: git
-  - name: wget
+  - name: caskroom/cask/ngrok
+    bin_name: ngrok
 
 toolkit:
   go:
     package_name: github.com/bitrise-steplib/steps-remote-access-macos-ngrok
 
 inputs:
+  - ngrok_auth_token: $NGROK_AUTH_TOKEN
+    opts:
+      title: Ngrok Authtoken
+      summary: Ngrok Authtoken
+      description: |
+        To be able to use this step you have to register an [ngrok](https://ngrok.com/) account.
+        Once you registered an account on ngrok go to the [Auth menu](https://dashboard.ngrok.com/auth),
+        you can find your Ngrok Authtoken there.
+      is_expand: true
+      is_required: true
   - ssh_public_key: $SSH_PUBLIC_KEY
     opts:
       title: "SSH public key"
-      summary: Summary.
+      summary: SSH public key for SSH connection.
       description: |
-        Description of this input.
+        The SSH public key to enable for SSH connection.
 
-        Can be Markdown formatted text.
+        You can generate a suitable SSH key with: `ssh-keygen -t rsa -b 4096 -P '' -f ./bitrise-ssh`
+
+        If you used the above command to generate the SSH key-pair:
+
+        * The public key (which you should specify for this input) can be found in: `bitrise-ssh.pub`
+        * And the private key (which you don't have to specify here, but you'll need it when you try to SSH into the host) can be found in: `./bitrise-ssh`
       is_expand: true
       is_required: true
-  - screen_share_pw: $SCREEN_SHARE_PASSWORD
+  - user_and_screen_share_password: $USER_AND_SCREEN_SHARE_PASSWORD
     opts:
-      title: "Screen share password"
-      summary: Summary.
+      title: "User and Screen Share password"
+      summary: The specified password will be set as the current User's password and as the VNC password.
       description: |
-        Description of this input.
-
-        Can be Markdown formatted text.
+        The specified password **will be set as the current User's password** and as the VNC password.
       is_expand: true
       is_required: true
-  - auth_token: $NGROK_AUTH_TOKEN
+  - is_step_debug_mode: "false"
     opts:
-      title: "Auth token"
-      summary: Summary.
+      category: Debug
+      title: "Step Debug Mode"
+      summary: |-
+        WARNING: enabling this option exposes secrets! Should only be used for development purposes / to debug the step!
       description: |
-        Description of this input.
-
-        Can be Markdown formatted text.
-      is_expand: true
+        **WARNING:** enabling this option exposes secrets! Should only be used for development purposes / to debug the step!
       is_required: true
+      value_options:
+      - "false"
+      - "true"

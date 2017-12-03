@@ -1,6 +1,13 @@
-# ngrok
+# Remote access with Ngrok for macOS
 
-ngrok
+**DO NOT RUN THIS STEP ON YOUR OWN MAC!!**
+
+Based on its inputs, if specified, this step changes the current user's MacOS login password!
+
+The Step also changes the SSH `authorized_keys`, to allow access for the specified key,
+so please be very cautious where you run this step!
+
+This step was created purely for remote debugging purposes!
 
 
 ## How to use this Step

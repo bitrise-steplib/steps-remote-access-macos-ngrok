@@ -1,46 +1,52 @@
 package main
 
 import (
-	"archive/zip"
+	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
+	"net/url"
 	"os"
-	"path/filepath"
-	"strings"
+	"os/user"
+	"time"
+
+	"github.com/bitrise-io/go-utils/colorstring"
+
+	"github.com/bitrise-io/go-utils/fileutil"
 
 	"github.com/bitrise-io/go-utils/command"
 	"github.com/bitrise-io/go-utils/log"
+	"github.com/pkg/errors"
 )
 
 const (
-	authorized_keys = "$HOME/.ssh/authorized_keys"
-	kickstart       = "/System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart"
-	url             = "https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-darwin-amd64.zip"
-	zipFile         = "ngrok.zip"
-	dir             = "/usr/local/bin"
-	ngrokFile       = "/tmp/ngrok-config.yml"
+	authorizedKeysFilePath = "$HOME/.ssh/authorized_keys"
+	kickstart              = "/System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart"
+	zipFile                = "ngrok.zip"
+	dir                    = "/usr/local/bin"
+	ngrokFile              = "/tmp/ngrok-config.yml"
 )
 
-const ngrokConfig = `authtoken: $AUTHTOKEN
-tunnels:
-  ssh:
-    addr: 22
-    proto: tcp
-  vnc:
-    addr: 5900
-    proto: tcp
-`
+var (
+	isDebugMode = false
+)
 
-func fail(format string, v ...interface{}) {
-	log.Errorf(format, v...)
-	os.Exit(1)
+// NgrokTunnelConfig ...
+type NgrokTunnelConfig struct {
+	Addr  int    `json:"addr,omitempty"`
+	Proto string `json:"proto,omitempty"`
 }
 
+// NgrokConfig ...
+type NgrokConfig struct {
+	Authtoken string                       `json:"authtoken,omitempty"`
+	Tunnels   map[string]NgrokTunnelConfig `json:"tunnels,omitempty"`
+}
+
+// AddAuthorizedKey ...
 func AddAuthorizedKey(sshKey string) error {
-	f, err := os.OpenFile(os.ExpandEnv(authorized_keys), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(os.ExpandEnv(authorizedKeysFilePath), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
-		return fmt.Errorf("Can't open file (%s), error: %v", authorized_keys, err)
+		return fmt.Errorf("Can't open file (%s), error: %v", authorizedKeysFilePath, err)
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
@@ -54,148 +60,182 @@ func AddAuthorizedKey(sshKey string) error {
 	return err
 }
 
+// EnableRemoteDesktop ...
 func EnableRemoteDesktop(password string) error {
 	args := []string{kickstart, "-activate", "-configure", "-access", "-on", "-clientopts", "-setvnclegacy", "-vnclegacy", "yes", "-clientopts", "-setvncpw", "-vncpw", password, "-restart", "-agent", "-privs", "-all"}
 	cmd := command.New("sudo", args...)
-	log.Infof("\n$ %s\n", cmd.PrintableCommandArgs())
+	if isDebugMode {
+		log.Infof("\n$ %s\n", cmd.PrintableCommandArgs())
+	}
 	return cmd.Run()
 }
 
-func downloadFromUrl(url string) error {
-	output, err := os.Create(zipFile)
+// ChangeUserPassword ...
+func ChangeUserPassword(changePasswordTo string) error {
+	user, err := user.Current()
 	if err != nil {
-		return fmt.Errorf("Error while creating file (%s), error: %v\n", zipFile, err)
+		return errors.WithStack(err)
 	}
-	defer output.Close()
 
-	response, err := http.Get(url)
-	if err != nil {
-		return fmt.Errorf("Error while downloading url (%s), error: %v\n", url, err)
-	}
-	defer response.Body.Close()
+	log.Printf(" (!) Changing password of user: %s", user.Username)
 
-	_, err = io.Copy(output, response.Body)
-	if err != nil {
-		return fmt.Errorf("Error while downloading url (%s), error: %v\n", url, err)
+	cmd := command.New("sudo", "dscl", ".", "-passwd", "/Users/"+user.Username, changePasswordTo)
+	if isDebugMode {
+		log.Infof("\n$ %s\n", cmd.PrintableCommandArgs())
 	}
-	return nil
+	return cmd.Run()
 }
 
 func createNgrokConf(authToken string) error {
-	c, err := os.Create(ngrokFile)
-	if err != nil {
-		return fmt.Errorf("Error while creating file (%s), error: %v\n", ngrokFile, err)
+	ngrokConfig := NgrokConfig{
+		Authtoken: authToken,
+		Tunnels: map[string]NgrokTunnelConfig{
+			"ssh": NgrokTunnelConfig{
+				Addr:  22,
+				Proto: "tcp",
+			},
+			"vnc": NgrokTunnelConfig{
+				Addr:  5900,
+				Proto: "tcp",
+			},
+		},
 	}
-	defer c.Close()
 
-	_, err = io.WriteString(c, strings.Replace(ngrokConfig, "$AUTHTOKEN", authToken, -1))
+	ngrokConfigBytes, err := json.Marshal(ngrokConfig)
 	if err != nil {
-		return fmt.Errorf("Error while write to file (%s), error: %v\n", ngrokFile, err)
+		errors.WithStack(err)
 	}
-	return nil
+
+	return errors.WithStack(fileutil.WriteBytesToFile(ngrokFile, ngrokConfigBytes))
 }
 
-func Unzip(src, dest string) error {
-	r, err := zip.OpenReader(src)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := r.Close(); err != nil {
-			panic(err)
-		}
-	}()
-
-	os.MkdirAll(dest, 0755)
-
-	// Closure to address file descriptors issue with all the deferred .Close() methods
-	extractAndWriteFile := func(f *zip.File) error {
-		rc, err := f.Open()
-		if err != nil {
-			return err
-		}
-		defer func() {
-			if err := rc.Close(); err != nil {
-				panic(err)
-			}
-		}()
-
-		path := filepath.Join(dest, f.Name)
-
-		if f.FileInfo().IsDir() {
-			os.MkdirAll(path, f.Mode())
-		} else {
-			os.MkdirAll(filepath.Dir(path), f.Mode())
-			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-			if err != nil {
-				return err
-			}
-			defer func() {
-				if err := f.Close(); err != nil {
-					panic(err)
-				}
-			}()
-
-			_, err = io.Copy(f, rc)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	for _, f := range r.File {
-		err := extractAndWriteFile(f)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func startNgrok() error {
+func startNgrokAsync() error {
 	cmd := command.New("ngrok", "start", "--all", "--config", ngrokFile)
 	log.Infof("\n$ %s\n", cmd.PrintableCommandArgs())
-	return cmd.Run()
+	return cmd.GetCmd().Start()
 }
 
-func main() {
+func fetchAndPrintAcessInfosFromNgrok() error {
+	// fetch ngrok tunnel infos via its localhost api
+	client := &http.Client{Timeout: 10 * time.Second}
+	r, err := client.Get("http://localhost:4040/api/tunnels")
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	defer r.Body.Close()
+
+	ngrokTunnels := struct {
+		Tunnels []struct {
+			Name      string `json:"name"`
+			PublicURL string `json:"public_url"`
+		} `json:"tunnels"`
+	}{}
+
+	if err := json.NewDecoder(r.Body).Decode(&ngrokTunnels); err != nil {
+		return errors.WithStack(err)
+	}
+
+	var sshURL, vncURL *url.URL
+	for _, aTunnel := range ngrokTunnels.Tunnels {
+		switch aTunnel.Name {
+		case "ssh":
+			u, err := url.Parse(aTunnel.PublicURL)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			sshURL = u
+		case "vnc":
+			u, err := url.Parse(aTunnel.PublicURL)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			vncURL = u
+		default:
+			return errors.Errorf("Unexpected tunnel found: %+v", aTunnel)
+		}
+	}
+
+	user, err := user.Current()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	currentUserUsername := user.Username
+
+	fmt.Println()
+	fmt.Println("--- Remote Access configs ---")
+	fmt.Println("Remote Access is now configured and enabled. ")
+
+	fmt.Println()
+	fmt.Println("SSH:")
+	fmt.Println("To SSH into this host:")
+	fmt.Println(" * First ensure that the SSH key you specified is activated (e.g. run: `ssh-add -D && ssh-add /path/to/ssh/private-key`")
+	fmt.Printf(" * Then ssh with: `ssh %s@%s -p %s`\n", currentUserUsername, sshURL.Hostname(), sshURL.Port())
+
+	fmt.Println()
+	fmt.Println("VNC (Screen Sharing):")
+	fmt.Println("To VNC / Screen Share / Remote Desktop into this host run the following command in your Terminal:")
+	fmt.Printf("    open vnc://%s@%s:%s\n", currentUserUsername, vncURL.Hostname(), vncURL.Port())
+	fmt.Println(colorstring.Yellow("Note: the password for the login is the password you specified for this step!"))
+	fmt.Println()
+	fmt.Println("------------------------------")
+	fmt.Println()
+
+	return nil
+}
+
+func doMain() error {
 	configs := createConfigsModelFromEnvs()
 	configs.print()
 	if err := configs.validate(); err != nil {
-		fail("Issue with input: %v", err)
+		return errors.Wrap(err, "Issue with input")
+	}
+	isDebugMode = configs.IsStepDebugMode
+
+	log.Printf("Add authorized key...")
+	if err := AddAuthorizedKey(configs.SSHPublicKey); err != nil {
+		return errors.Wrap(err, "Can't add authorized key")
 	}
 
-	log.Printf("\nAdd authorized key...")
-	if err := AddAuthorizedKey(configs.SSHPublicKey); err != nil {
-		fail("Can't add authorized key, error: %v\n", err)
+	log.Printf("Change user password...")
+	if err := ChangeUserPassword(configs.PasswordToSet); err != nil {
+		return errors.Wrap(err, "Can't change user password")
 	}
 
 	log.Printf("Enable remote desktop...")
-	if err := EnableRemoteDesktop(configs.ScreenSharePW); err != nil {
-		fail("Can't enable remote desktop, error: %v", err)
-	}
-
-	log.Printf("Downloading %s to %s", url, zipFile)
-	if err := downloadFromUrl(url); err != nil {
-		fail("Error while downloading url (%s), error: %v\n", url, err)
-	}
-
-	log.Printf("Unzip %s to %s", zipFile, dir)
-	if err := Unzip(zipFile, dir); err != nil {
-		fail("Error while unzip file (%s), error: %v\n", zipFile, err)
+	if err := EnableRemoteDesktop(configs.PasswordToSet); err != nil {
+		return errors.Wrap(err, "Can't enable remote desktop")
 	}
 
 	log.Printf("Creating Ngrok config to %s", ngrokFile)
-	if err := createNgrokConf(configs.AuthToken); err != nil {
-		fail("Failed to create Ngrok config, error: %v", err)
+	if err := createNgrokConf(configs.NgrokAuthToken); err != nil {
+		return errors.Wrap(err, "Failed to create Ngrok config")
 	}
 
 	log.Printf("Starting Ngrok...")
-	if err := startNgrok(); err != nil {
-		fail("Failed to start Ngrok, error: %v", err)
+	if err := startNgrokAsync(); err != nil {
+		return errors.Wrap(err, "Failed to start Ngrok")
+	}
+	time.Sleep(5 * time.Second)
+
+	if err := fetchAndPrintAcessInfosFromNgrok(); err != nil {
+		return errors.Wrap(err, "Failed to fetch access infos from ngrok")
 	}
 
+	// wait forever
+	fmt.Println()
+	fmt.Println("You can now connect, keeping the connection open ...")
+	for {
+		fmt.Print(".")
+		time.Sleep(10 * time.Second)
+	}
+
+	return nil
+}
+
+func main() {
+	if err := doMain(); err != nil {
+		log.Errorf("ERROR: %+v", err)
+		os.Exit(1)
+	}
 	log.Donef("\nSuccess")
 }
