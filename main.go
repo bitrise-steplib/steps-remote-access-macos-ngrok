@@ -9,7 +9,6 @@ import (
 	"os/user"
 	"time"
 
-	"github.com/bitrise-io/go-utils/colorstring"
 	"github.com/bitrise-io/go-utils/retry"
 
 	"github.com/bitrise-io/go-utils/fileutil"
@@ -187,7 +186,7 @@ func fetchAndPrintAcessInfosFromNgrok() error {
 			fmt.Println("VNC (Screen Sharing):")
 			fmt.Println("To VNC / Screen Share / Remote Desktop into this host run the following command in your Terminal:")
 			fmt.Printf("    open vnc://%s@%s:%s\n", currentUserUsername, vncURL.Hostname(), vncURL.Port())
-			fmt.Println(colorstring.Yellow("Note: the password for the login is the password you specified for this step!"))
+			log.Warnf("Note: the password for the login is the password you specified for this step!")
 		default:
 			return errors.Errorf("Unexpected tunnel found: %+v", aTunnel)
 		}
