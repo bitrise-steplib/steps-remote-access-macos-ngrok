@@ -126,6 +126,9 @@ func fetchAndPrintAcessInfosFromNgrok() error {
 	client := &http.Client{Timeout: 10 * time.Second}
 	var resp *http.Response
 	err := retry.Times(3).Wait(5 * time.Second).Try(func(attempt uint) error {
+		if attempt != 0 {
+			log.Warnf("Attepmt %d failed, retrying ...", attempt)
+		}
 		var err error
 		resp, err = client.Get("http://localhost:4040/api/tunnels")
 		return errors.WithStack(err)
