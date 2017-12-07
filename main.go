@@ -230,7 +230,7 @@ func doMain() error {
 	}
 
 	log.Printf("Creating Ngrok config to %s", ngrokFile)
-	if err := createNgrokConf(configs.NgrokAuthToken, configs.PasswordToSet != "", configs.PasswordToSet != ""); err != nil {
+	if err := createNgrokConf(configs.NgrokAuthToken, configs.SSHPublicKey != "", configs.PasswordToSet != ""); err != nil {
 		return errors.Wrap(err, "Failed to create Ngrok config")
 	}
 
