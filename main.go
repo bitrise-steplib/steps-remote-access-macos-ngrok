@@ -87,19 +87,24 @@ func ChangeUserPassword(changePasswordTo string) error {
 	return cmd.Run()
 }
 
-func createNgrokConf(authToken string) error {
+func createNgrokConf(authToken string, isSSH, isVNC bool) error {
+	tunnels := map[string]NgrokTunnelConfig{}
+	if isSSH {
+		tunnels["ssh"] = NgrokTunnelConfig{
+			Addr:  22,
+			Proto: "tcp",
+		}
+	}
+	if isVNC {
+		tunnels["vnc"] = NgrokTunnelConfig{
+			Addr:  5900,
+			Proto: "tcp",
+		}
+	}
+
 	ngrokConfig := NgrokConfig{
 		Authtoken: authToken,
-		Tunnels: map[string]NgrokTunnelConfig{
-			"ssh": NgrokTunnelConfig{
-				Addr:  22,
-				Proto: "tcp",
-			},
-			"vnc": NgrokTunnelConfig{
-				Addr:  5900,
-				Proto: "tcp",
-			},
-		},
+		Tunnels:   tunnels,
 	}
 
 	ngrokConfigBytes, err := json.Marshal(ngrokConfig)
@@ -141,26 +146,6 @@ func fetchAndPrintAcessInfosFromNgrok() error {
 		return errors.WithStack(err)
 	}
 
-	var sshURL, vncURL *url.URL
-	for _, aTunnel := range ngrokTunnels.Tunnels {
-		switch aTunnel.Name {
-		case "ssh":
-			u, err := url.Parse(aTunnel.PublicURL)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			sshURL = u
-		case "vnc":
-			u, err := url.Parse(aTunnel.PublicURL)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			vncURL = u
-		default:
-			return errors.Errorf("Unexpected tunnel found: %+v", aTunnel)
-		}
-	}
-
 	user, err := user.Current()
 	if err != nil {
 		return errors.WithStack(err)
@@ -171,17 +156,34 @@ func fetchAndPrintAcessInfosFromNgrok() error {
 	fmt.Println("--- Remote Access configs ---")
 	fmt.Println("Remote Access is now configured and enabled. ")
 
-	fmt.Println()
-	fmt.Println("SSH:")
-	fmt.Println("To SSH into this host:")
-	fmt.Println(" * First ensure that the SSH key you specified is activated (e.g. run: `ssh-add -D && ssh-add /path/to/ssh/private-key`")
-	fmt.Printf(" * Then ssh with: `ssh %s@%s -p %s`\n", currentUserUsername, sshURL.Hostname(), sshURL.Port())
+	for _, aTunnel := range ngrokTunnels.Tunnels {
+		switch aTunnel.Name {
+		case "ssh":
+			sshURL, err := url.Parse(aTunnel.PublicURL)
+			if err != nil {
+				return errors.WithStack(err)
+			}
 
-	fmt.Println()
-	fmt.Println("VNC (Screen Sharing):")
-	fmt.Println("To VNC / Screen Share / Remote Desktop into this host run the following command in your Terminal:")
-	fmt.Printf("    open vnc://%s@%s:%s\n", currentUserUsername, vncURL.Hostname(), vncURL.Port())
-	fmt.Println(colorstring.Yellow("Note: the password for the login is the password you specified for this step!"))
+			fmt.Println()
+			fmt.Println("SSH:")
+			fmt.Println("To SSH into this host:")
+			fmt.Println(" * First ensure that the SSH key you specified is activated (e.g. run: `ssh-add -D && ssh-add /path/to/ssh/private-key`")
+			fmt.Printf(" * Then ssh with: `ssh %s@%s -p %s`\n", currentUserUsername, sshURL.Hostname(), sshURL.Port())
+		case "vnc":
+			vncURL, err := url.Parse(aTunnel.PublicURL)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			fmt.Println()
+			fmt.Println("VNC (Screen Sharing):")
+			fmt.Println("To VNC / Screen Share / Remote Desktop into this host run the following command in your Terminal:")
+			fmt.Printf("    open vnc://%s@%s:%s\n", currentUserUsername, vncURL.Hostname(), vncURL.Port())
+			fmt.Println(colorstring.Yellow("Note: the password for the login is the password you specified for this step!"))
+		default:
+			return errors.Errorf("Unexpected tunnel found: %+v", aTunnel)
+		}
+	}
+
 	fmt.Println()
 	fmt.Println("------------------------------")
 	fmt.Println()
@@ -197,23 +199,31 @@ func doMain() error {
 	}
 	isDebugMode = configs.IsStepDebugMode
 
-	log.Printf("Add authorized key...")
-	if err := AddAuthorizedKey(configs.SSHPublicKey); err != nil {
-		return errors.Wrap(err, "Can't add authorized key")
+	if configs.SSHPublicKey != "" {
+		log.Printf("Add authorized key...")
+		if err := AddAuthorizedKey(configs.SSHPublicKey); err != nil {
+			return errors.Wrap(err, "Can't add authorized key")
+		}
+	} else {
+		log.Warnf("No SSH public key specified, skipping SSH setup.")
 	}
 
-	log.Printf("Change user password...")
-	if err := ChangeUserPassword(configs.PasswordToSet); err != nil {
-		return errors.Wrap(err, "Can't change user password")
-	}
+	if configs.PasswordToSet != "" {
+		log.Printf("Change user password...")
+		if err := ChangeUserPassword(configs.PasswordToSet); err != nil {
+			return errors.Wrap(err, "Can't change user password")
+		}
 
-	log.Printf("Enable remote desktop...")
-	if err := EnableRemoteDesktop(configs.PasswordToSet); err != nil {
-		return errors.Wrap(err, "Can't enable remote desktop")
+		log.Printf("Enable remote desktop...")
+		if err := EnableRemoteDesktop(configs.PasswordToSet); err != nil {
+			return errors.Wrap(err, "Can't enable remote desktop")
+		}
+	} else {
+		log.Warnf("No (User & VNC) Password specified, skipping Remote Desktop / Screen Sharing setup.")
 	}
 
 	log.Printf("Creating Ngrok config to %s", ngrokFile)
-	if err := createNgrokConf(configs.NgrokAuthToken); err != nil {
+	if err := createNgrokConf(configs.NgrokAuthToken, configs.PasswordToSet != "", configs.PasswordToSet != ""); err != nil {
 		return errors.Wrap(err, "Failed to create Ngrok config")
 	}
 
