@@ -118,15 +118,12 @@ func startNgrokAsync() error {
 
 func fetchAndPrintAcessInfosFromNgrok() error {
 	// fetch ngrok tunnel infos via its localhost api
+	client := &http.Client{Timeout: 10 * time.Second}
 	var resp *http.Response
 	err := retry.Times(3).Wait(5 * time.Second).Try(func(attempt uint) error {
-		client := &http.Client{Timeout: 10 * time.Second}
-		r, err := client.Get("http://localhost:4040/api/tunnels")
-		if err != nil {
-			return errors.WithStack(err)
-		}
-		resp = r
-		return nil
+		var err error
+		resp, err = client.Get("http://localhost:4040/api/tunnels")
+		return errors.WithStack(err)
 	})
 	if err != nil {
 		return errors.WithStack(err)
