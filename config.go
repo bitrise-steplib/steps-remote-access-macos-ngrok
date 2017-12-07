@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/bitrise-io/go-utils/log"
+	"github.com/pkg/errors"
 )
 
 // ConfigsModel ...
@@ -43,14 +44,12 @@ func (configs ConfigsModel) print() {
 }
 
 func (configs ConfigsModel) validate() error {
-	for k, v := range map[string]string{
-		"SSHPublicKey":   configs.SSHPublicKey,
-		"PasswordToSet":  configs.PasswordToSet,
-		"NgrokAuthToken": configs.NgrokAuthToken,
-	} {
-		if v == "" {
-			return fmt.Errorf("no %s parameter specified", k)
-		}
+	if configs.NgrokAuthToken == "" {
+		return errors.New("No NgrokAuthToken parameter specified")
 	}
+	if configs.PasswordToSet == "" && configs.SSHPublicKey == "" {
+		return errors.New("Neither SSHPublicKey nor (VNC) PasswordToSet specified. At least one is required")
+	}
+
 	return nil
 }

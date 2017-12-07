@@ -21,6 +21,16 @@ description: |
   To be able to use this step you have to register an [ngrok](https://ngrok.com/) account.
   Once you registered an account on ngrok go to the [Auth menu](https://dashboard.ngrok.com/auth),
   you can find your Ngrok Authtoken there.
+
+  ## Configuration
+
+  ngrok auth token is required, as well as either an SSH or a Screen Sharing / VNC config.
+  If neither SSH nor VNC / screen sharing is specified the step will fail.
+
+  You can of course speicify both SSH and VNC configs, in which case the step
+  will configure both, but **if you only need SSH or VNC then you're free to only provide that configuration**,
+  and the step will only enable the feature (SSH, VNC)
+  which you provide; it simply won't activate the one(s) you don't provide.
 website: https://github.com/bitrise-steplib/steps-remote-access-macos-ngrok
 source_code_url: https://github.com/bitrise-steplib/steps-remote-access-macos-ngrok
 support_url: https://github.com/bitrise-steplib/steps-remote-access-macos-ngrok/issues
@@ -68,7 +78,7 @@ inputs:
         * The public key (which you should specify for this input) can be found in: `bitrise-ssh.pub`
         * And the private key (which you don't have to specify here, but you'll need it when you try to SSH into the host) can be found in: `./bitrise-ssh`
       is_expand: true
-      is_required: true
+      is_required: false
   - user_and_screen_share_password: $USER_AND_SCREEN_SHARE_PASSWORD
     opts:
       title: "User and Screen Share password"
@@ -76,7 +86,7 @@ inputs:
       description: |
         The specified password **will be set as the current User's password** and as the VNC password.
       is_expand: true
-      is_required: true
+      is_required: false
   - is_step_debug_mode: "false"
     opts:
       category: Debug
