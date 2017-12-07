@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/bitrise-io/go-utils/colorstring"
+	"github.com/bitrise-io/go-utils/retry"
 
 	"github.com/bitrise-io/go-utils/fileutil"
 
@@ -117,12 +118,20 @@ func startNgrokAsync() error {
 
 func fetchAndPrintAcessInfosFromNgrok() error {
 	// fetch ngrok tunnel infos via its localhost api
-	client := &http.Client{Timeout: 10 * time.Second}
-	r, err := client.Get("http://localhost:4040/api/tunnels")
+	var resp *http.Response
+	err := retry.Times(3).Wait(5 * time.Second).Try(func(attempt uint) error {
+		client := &http.Client{Timeout: 10 * time.Second}
+		r, err := client.Get("http://localhost:4040/api/tunnels")
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		resp = r
+		return nil
+	})
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	defer r.Body.Close()
+	defer resp.Body.Close()
 
 	ngrokTunnels := struct {
 		Tunnels []struct {
@@ -131,7 +140,7 @@ func fetchAndPrintAcessInfosFromNgrok() error {
 		} `json:"tunnels"`
 	}{}
 
-	if err := json.NewDecoder(r.Body).Decode(&ngrokTunnels); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&ngrokTunnels); err != nil {
 		return errors.WithStack(err)
 	}
 
@@ -215,7 +224,6 @@ func doMain() error {
 	if err := startNgrokAsync(); err != nil {
 		return errors.Wrap(err, "Failed to start Ngrok")
 	}
-	time.Sleep(5 * time.Second)
 
 	if err := fetchAndPrintAcessInfosFromNgrok(); err != nil {
 		return errors.Wrap(err, "Failed to fetch access infos from ngrok")
