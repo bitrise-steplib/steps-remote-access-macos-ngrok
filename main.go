@@ -112,6 +112,10 @@ func createNgrokConf(authToken string, isSSH, isVNC bool) error {
 		errors.WithStack(err)
 	}
 
+	if isDebugMode {
+		log.Warnf("ngrok config: %s", ngrokConfigBytes)
+	}
+
 	return errors.WithStack(fileutil.WriteBytesToFile(ngrokFile, ngrokConfigBytes))
 }
 
