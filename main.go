@@ -208,8 +208,10 @@ func doMain() error {
 	}
 	isDebugMode = configs.IsStepDebugMode
 
+	fmt.Println()
+	log.Printf("SSH setup ...")
 	if configs.SSHPublicKey != "" {
-		log.Printf("Add authorized key...")
+		log.Printf("Add authorized key ...")
 		if err := AddAuthorizedKey(configs.SSHPublicKey); err != nil {
 			return errors.Wrap(err, "Can't add authorized key")
 		}
@@ -217,6 +219,8 @@ func doMain() error {
 		log.Warnf("No SSH public key specified, skipping SSH setup.")
 	}
 
+	fmt.Println()
+	log.Printf("VNC / remote desktop / screen sharing setup ...")
 	if configs.PasswordToSet != "" {
 		log.Printf("Change user password...")
 		if err := ChangeUserPassword(configs.PasswordToSet); err != nil {
@@ -231,6 +235,7 @@ func doMain() error {
 		log.Warnf("No (User & VNC) Password specified, skipping Remote Desktop / Screen Sharing setup.")
 	}
 
+	fmt.Println()
 	log.Printf("Creating Ngrok config to %s", ngrokFile)
 	if err := createNgrokConf(configs.NgrokAuthToken, configs.SSHPublicKey != "", configs.PasswordToSet != ""); err != nil {
 		return errors.Wrap(err, "Failed to create Ngrok config")
@@ -241,6 +246,7 @@ func doMain() error {
 		return errors.Wrap(err, "Failed to start Ngrok")
 	}
 
+	log.Printf("Checking access configurations ...")
 	if err := fetchAndPrintAcessInfosFromNgrok(); err != nil {
 		return errors.Wrap(err, "Failed to fetch access infos from ngrok")
 	}
