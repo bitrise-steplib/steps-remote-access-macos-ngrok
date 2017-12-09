@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"os/user"
+	"strings"
 	"time"
 
 	"github.com/bitrise-io/go-utils/retry"
@@ -21,14 +22,10 @@ import (
 const (
 	authorizedKeysFilePath = "$HOME/.ssh/authorized_keys"
 	kickstart              = "/System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart"
-	zipFile                = "ngrok.zip"
-	dir                    = "/usr/local/bin"
 	ngrokFile              = "/tmp/ngrok-config.yml"
 )
 
-var (
-	isDebugMode = false
-)
+var isDebugMode = false
 
 // NgrokTunnelConfig ...
 type NgrokTunnelConfig struct {
@@ -43,14 +40,14 @@ type NgrokConfig struct {
 }
 
 // AddAuthorizedKey ...
-func AddAuthorizedKey(sshKey string) error {
+func AddAuthorizedKey(sshKey string) (err error) {
 	f, err := os.OpenFile(os.ExpandEnv(authorizedKeysFilePath), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		return fmt.Errorf("Can't open file (%s), error: %v", authorizedKeysFilePath, err)
 	}
 	defer func() {
-		if err := f.Close(); err != nil {
-			panic(err)
+		if cerr := f.Close(); cerr != nil && err == nil {
+			err = cerr
 		}
 	}()
 
@@ -108,7 +105,7 @@ func createNgrokConf(authToken string, isSSH, isVNC bool) error {
 
 	ngrokConfigBytes, err := json.Marshal(ngrokConfig)
 	if err != nil {
-		errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	if isDebugMode {
@@ -124,24 +121,27 @@ func startNgrokAsync() error {
 	return cmd.GetCmd().Start()
 }
 
-func fetchAndPrintAcessInfosFromNgrok() error {
+func fetchAndPrintAcessInfosFromNgrok() (err error) {
 	// fetch ngrok tunnel infos via its localhost api
 	client := &http.Client{Timeout: 10 * time.Second}
 	var resp *http.Response
-	err := retry.Times(3).Wait(5 * time.Second).Try(func(attempt uint) error {
+	err = retry.Times(3).Wait(5 * time.Second).Try(func(attempt uint) error {
 		if attempt != 0 {
 			if isDebugMode {
 				log.Warnf("Attempt %d failed, retrying ...", attempt)
 			}
 		}
-		var err error
 		resp, err = client.Get("http://localhost:4040/api/tunnels")
 		return errors.WithStack(err)
 	})
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	ngrokTunnels := struct {
 		Tunnels []struct {
@@ -150,7 +150,7 @@ func fetchAndPrintAcessInfosFromNgrok() error {
 		} `json:"tunnels"`
 	}{}
 
-	if err := json.NewDecoder(resp.Body).Decode(&ngrokTunnels); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&ngrokTunnels); err != nil {
 		return errors.WithStack(err)
 	}
 
@@ -192,14 +192,12 @@ func fetchAndPrintAcessInfosFromNgrok() error {
 		}
 	}
 
-	fmt.Println()
-	fmt.Println("------------------------------")
-	fmt.Println()
+	fmt.Printf("\n%s\n\n", strings.Repeat("-", 30))
 
 	return nil
 }
 
-func doMain() error {
+func mainE() error {
 	configs := createConfigsModelFromEnvs()
 	configs.print()
 	if err := configs.validate(); err != nil {
@@ -257,12 +255,10 @@ func doMain() error {
 		fmt.Print(".")
 		time.Sleep(10 * time.Second)
 	}
-
-	return nil
 }
 
 func main() {
-	if err := doMain(); err != nil {
+	if err := mainE(); err != nil {
 		log.Errorf("ERROR: %+v", err)
 		os.Exit(1)
 	}
